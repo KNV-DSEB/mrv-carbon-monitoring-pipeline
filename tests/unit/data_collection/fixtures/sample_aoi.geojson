@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"name": "synthetic-test-polygon"},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [0.0, 0.0],
+            [0.0, 0.01],
+            [0.01, 0.01],
+            [0.01, 0.0],
+            [0.0, 0.0]
+          ]
+        ]
+      }
+    }
+  ]
+}

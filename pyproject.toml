@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mrv-carbon-monitoring"
+version = "0.1.0"
+description = "AI system for measuring, reporting, and verifying methane emission reductions from Alternate Wetting and Drying (AWD) irrigation in Vietnamese rice paddies using Sentinel-2 imagery."
+requires-python = ">=3.9"
+dependencies = [
+    "earthengine-api",
+    "python-dotenv",
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+*.pem
+*credentials*.json
+*service-account*.json
+
+# Data (raw/interim/processed are regenerable or too large for git)
+data/raw/**
+data/interim/**
+data/processed/**
+data/external/**
+!data/**/.gitkeep
+# Small AOI reference GeoJSON is tracked — parent dir must be un-ignored
+# too, or git won't recurse into it to apply the file-level exception.
+!data/external/aoi/
+!data/external/aoi/*.geojson
+
+# MLflow local tracking store
+mlruns/
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Docker
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/

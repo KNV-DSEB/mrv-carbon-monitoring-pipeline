@@ -1,0 +1,5 @@
+# Source of truth for dependencies is pyproject.toml. This file mirrors
+# project.dependencies for local dev convenience.
+earthengine-api
+python-dotenv
+pytest
