@@ -8,7 +8,7 @@ import ee
 
 from mrv.data_collection.aoi import load_aoi_geometry
 from mrv.data_collection.gee_client import init_ee
-from mrv.data_collection.sentinel2 import SENTINEL2_COLLECTION_ID, mask_clouds
+from mrv.data_collection.sentinel2 import mask_clouds, scene_asset_id
 from mrv.features.indices import get_index_function
 from mrv.features.zonal import zonal_mean
 from mrv.utils.config import Config, load_config
@@ -35,11 +35,40 @@ def _included_scenes(manifest: dict, min_clear_fraction: float) -> list[dict]:
     ]
 
 
+def _assert_scenes_to_process(
+    manifest: dict, included: list[dict], min_clear_fraction: float
+) -> None:
+    """Fail fast with an actionable message when there's nothing to compute.
+
+    Distinguishes an empty manifest (run data_collection first) from a manifest
+    whose scenes all fall below MIN_CLEAR_FRACTION (lower the threshold or
+    collect a denser series). Raised before touching GEE, so the operator sees
+    guidance instead of an opaque empty-FeatureCollection error.
+    """
+    if included:
+        return
+    all_scenes = manifest["scenes"]
+    if not all_scenes:
+        raise RuntimeError(
+            "Manifest contains 0 scenes; nothing to compute. Run "
+            "data_collection first (python -m mrv.data_collection.collect) with "
+            "a wider DATE_START/DATE_END or a higher MAX_CLOUD_COVER_PCT."
+        )
+    best = max(scene["aoi_clear_fraction"] for scene in all_scenes)
+    raise RuntimeError(
+        f"None of the {len(all_scenes)} manifest scene(s) meet "
+        f"MIN_CLEAR_FRACTION={min_clear_fraction} (best available "
+        f"aoi_clear_fraction={best}). Lower MIN_CLEAR_FRACTION in .env or "
+        "collect a denser/clearer time series."
+    )
+
+
 def _fetch_masked_image(image_id: str) -> ee.Image:
-    # The manifest stores the Sentinel-2 system:index suffix, not the full
-    # asset ID, so it must be re-prefixed with the collection ID here.
-    full_asset_id = f"{SENTINEL2_COLLECTION_ID}/{image_id}"
-    return mask_clouds(ee.Image(full_asset_id))
+    # The manifest stores the bare Sentinel-2 system:index suffix, not the
+    # full asset id. scene_asset_id() (the single source of truth in
+    # data_collection.sentinel2) reconstructs the loadable asset id, so the
+    # two modules can't drift on the id format.
+    return mask_clouds(ee.Image(scene_asset_id(image_id)))
 
 
 def _compute_scene_row(scene: dict, aoi: ee.Geometry, index_names: list[str]) -> ee.Feature:
@@ -66,8 +95,9 @@ def compute_features(
     index_names: list[str],
     min_clear_fraction: float,
 ) -> list[dict]:
-    aoi = load_aoi_geometry(config.aoi_path)
     scenes = _included_scenes(manifest, min_clear_fraction)
+    _assert_scenes_to_process(manifest, scenes, min_clear_fraction)
+    aoi = load_aoi_geometry(config.aoi_path)
 
     # Built as a Python-side list rather than ee.ImageCollection.map():
     # per-scene metadata (sensing_date, clear_fraction) is already

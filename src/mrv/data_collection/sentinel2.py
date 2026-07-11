@@ -18,6 +18,18 @@ UNCLASSIFIED_SCL_CLASS = 7
 MANIFEST_REDUCE_SCALE_M = 20
 
 
+def scene_asset_id(system_index: str) -> str:
+    """Reconstruct the full Sentinel-2 asset id from a bare ``system:index``.
+
+    ``_build_scene_feature`` stores ``image_id = image.get("system:index")`` —
+    the bare granule suffix, not the full asset path. This is the single source
+    of truth for turning that suffix back into an ``ee.Image``-loadable asset
+    id; the features module imports it so the two modules can't drift on the id
+    format.
+    """
+    return f"{SENTINEL2_COLLECTION_ID}/{system_index}"
+
+
 def get_filtered_collection(
     aoi: ee.Geometry,
     date_start: str,
@@ -63,6 +75,8 @@ def _build_scene_feature(image: ee.Image, aoi: ee.Geometry) -> ee.Feature:
     return ee.Feature(
         None,
         {
+            # Bare system:index suffix; features re-expands it via
+            # sentinel2.scene_asset_id() before ee.Image(...).
             "image_id": image.get("system:index"),
             "sensing_date": image.date().format("YYYY-MM-dd"),
             "mgrs_tile": image.get("MGRS_TILE"),

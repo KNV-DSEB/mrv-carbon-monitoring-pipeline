@@ -45,9 +45,29 @@ def write_manifest(manifest: dict, output_path: Path = DEFAULT_OUTPUT_PATH) -> P
     return output_path
 
 
+def _assert_nonempty_manifest(manifest: dict, config: Config) -> None:
+    """Fail fast when a real query returns nothing.
+
+    ``collect_manifest()`` itself stays non-raising so the reconnaissance path
+    (``mrv.pipeline.recon``) can still summarize/persist an empty result; the
+    fail-fast guard lives here in the CLI entrypoint instead. No credentials
+    are referenced in the message.
+    """
+    if manifest["scene_count"] > 0:
+        return
+    raise RuntimeError(
+        "data_collection returned 0 Sentinel-2 scenes for AOI "
+        f"{config.aoi_path!r} over {config.date_start}..{config.date_end} "
+        f"with MAX_CLOUD_COVER_PCT={config.max_cloud_cover_pct}. "
+        "Nothing was written. Widen DATE_START/DATE_END or raise "
+        "MAX_CLOUD_COVER_PCT in .env, then re-run."
+    )
+
+
 def main() -> Path:
     config = load_config()
     manifest = collect_manifest(config)
+    _assert_nonempty_manifest(manifest, config)
     return write_manifest(manifest)
 
 

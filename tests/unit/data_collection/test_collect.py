@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
 
+import pytest
+
 from mrv.data_collection.collect import collect_manifest, main, write_manifest
 from mrv.data_collection.sentinel2 import mask_clouds
 from mrv.utils.config import Config
@@ -16,16 +18,18 @@ CONFIG = Config(
     feature_indices=("ndvi", "ndwi", "lswi"),
 )
 
+# image_id holds the bare Sentinel-2 system:index suffix that build_manifest
+# stores (not a full asset path) — features re-expands it via scene_asset_id().
 CANNED_SCENES = [
     {
-        "image_id": "COPERNICUS/S2_SR_HARMONIZED/scene_a",
+        "image_id": "20260701T033539_20260701T034339_T48QWH",
         "sensing_date": "2026-07-01",
         "mgrs_tile": "48QWH",
         "cloudy_pixel_percentage": 10.0,
         "aoi_clear_fraction": 0.9,
     },
     {
-        "image_id": "COPERNICUS/S2_SR_HARMONIZED/scene_b",
+        "image_id": "20260711T033539_20260711T034339_T48QWH",
         "sensing_date": "2026-07-11",
         "mgrs_tile": "48QWH",
         "cloudy_pixel_percentage": 20.0,
@@ -83,10 +87,27 @@ def test_main_loads_config_collects_and_writes(
     mock_load_config, mock_collect_manifest, mock_write_manifest
 ):
     config = mock_load_config.return_value
-    manifest = mock_collect_manifest.return_value
+    manifest = {"scene_count": len(CANNED_SCENES), "scenes": CANNED_SCENES}
+    mock_collect_manifest.return_value = manifest
 
     main()
 
     mock_load_config.assert_called_once_with()
     mock_collect_manifest.assert_called_once_with(config)
     mock_write_manifest.assert_called_once_with(manifest)
+
+
+@patch("mrv.data_collection.collect.write_manifest")
+@patch("mrv.data_collection.collect.collect_manifest")
+@patch("mrv.data_collection.collect.load_config")
+def test_main_raises_on_empty_manifest(
+    mock_load_config, mock_collect_manifest, mock_write_manifest
+):
+    mock_load_config.return_value = CONFIG
+    mock_collect_manifest.return_value = {"scene_count": 0, "scenes": []}
+
+    with pytest.raises(RuntimeError, match="0 Sentinel-2 scenes"):
+        main()
+
+    # Fail fast: no empty manifest is persisted.
+    mock_write_manifest.assert_not_called()

@@ -6,7 +6,16 @@ from mrv.data_collection.sentinel2 import (
     build_manifest,
     get_filtered_collection,
     mask_clouds,
+    scene_asset_id,
 )
+
+
+def test_scene_asset_id_reconstructs_full_asset_id():
+    # Round-trip lock: the bare system:index suffix that build_manifest stores,
+    # re-prefixed by scene_asset_id, is exactly the full asset id features loads.
+    system_index = "20260701T033539_20260701T034339_T48QWH"
+    assert scene_asset_id(system_index) == f"{SENTINEL2_COLLECTION_ID}/{system_index}"
+    assert scene_asset_id(system_index).startswith(SENTINEL2_COLLECTION_ID + "/")
 
 
 @patch("mrv.data_collection.sentinel2.ee")
@@ -95,14 +104,14 @@ def test_build_manifest_unwraps_feature_properties(mock_ee):
     aoi = MagicMock()
     canned_scenes = [
         {
-            "image_id": "COPERNICUS/S2_SR_HARMONIZED/scene_a",
+            "image_id": "20260701T033539_20260701T034339_T48QWH",
             "sensing_date": "2026-07-01",
             "mgrs_tile": "48QWH",
             "cloudy_pixel_percentage": 12.4,
             "aoi_clear_fraction": 0.91,
         },
         {
-            "image_id": "COPERNICUS/S2_SR_HARMONIZED/scene_b",
+            "image_id": "20260711T033539_20260711T034339_T48QWH",
             "sensing_date": "2026-07-11",
             "mgrs_tile": "48QWH",
             "cloudy_pixel_percentage": 30.0,

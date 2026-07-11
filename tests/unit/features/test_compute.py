@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from mrv.data_collection.sentinel2 import SENTINEL2_COLLECTION_ID
+import pytest
+
+from mrv.data_collection.sentinel2 import scene_asset_id
 from mrv.features.compute import (
     _compute_scene_row,
     _fetch_masked_image,
@@ -44,7 +46,7 @@ def test_fetch_masked_image_builds_full_asset_id_and_masks(mock_ee, mock_mask_cl
 
     _fetch_masked_image(image_id)
 
-    mock_ee.Image.assert_called_once_with(f"{SENTINEL2_COLLECTION_ID}/{image_id}")
+    mock_ee.Image.assert_called_once_with(scene_asset_id(image_id))
     mock_mask_clouds.assert_called_once_with(mock_ee.Image.return_value)
 
 
@@ -101,6 +103,24 @@ def test_compute_features_filters_and_returns_manifest_properties(
     features_arg = mock_ee.FeatureCollection.call_args[0][0]
     assert len(features_arg) == 1  # only scene_a passes the 0.8 threshold
     assert result == [canned_row]
+
+
+def test_compute_features_raises_when_all_scenes_filtered_out():
+    manifest = {
+        "scenes": [
+            {"image_id": "a", "sensing_date": "2026-07-01", "aoi_clear_fraction": 0.4},
+            {"image_id": "b", "sensing_date": "2026-07-11", "aoi_clear_fraction": 0.6},
+        ]
+    }
+
+    # Actionable error names the exact knob and the best available fraction.
+    with pytest.raises(RuntimeError, match="MIN_CLEAR_FRACTION"):
+        compute_features(CONFIG, manifest, ["ndvi"], min_clear_fraction=0.8)
+
+
+def test_compute_features_raises_when_manifest_empty():
+    with pytest.raises(RuntimeError, match="0 scenes"):
+        compute_features(CONFIG, {"scenes": []}, ["ndvi"], min_clear_fraction=0.8)
 
 
 def test_write_features_table_writes_expected_csv(tmp_path):
