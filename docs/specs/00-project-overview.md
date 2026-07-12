@@ -72,8 +72,13 @@ before that module starts, following the workflow in CLAUDE.md:
 
 1. `data_collection` — Sentinel-2 acquisition via GEE for the pilot AOI.
 2. `features` — spectral indices + zonal statistics.
-3. Rule-based flood/dry-cycle baseline (with model/heuristic comparison as
-   a later, separate step once the baseline exists).
+3. `baseline` — rule-based **crop-season phase** detection (flood/puddling →
+   growth → heading → ripening) from the sparse optical series. Honest reframe:
+   this is **not** AWD flood/dry-event detection — the first live run showed the
+   optical cadence can't resolve sub-monthly AWD cycles (see
+   [../reports/02-first-live-run-report.en.md](../reports/02-first-live-run-report.en.md)
+   and [06-baseline.md](06-baseline.md)). Model/heuristic comparison remains a
+   later, separate step once the baseline exists.
 4. `api` — FastAPI inference + MRV report endpoints.
 5. `dashboard` — Streamlit field-level view.
 

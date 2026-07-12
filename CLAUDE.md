@@ -4,11 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Bootstrap stage — the repository currently contains scaffolding only (directory
-structure, docs, config templates). No pipeline code, models, or API endpoints
-exist yet. This file describes the **target architecture** that implementation
-should converge on. Update it as each module lands so it stays a true
-description of the codebase, not just an aspiration.
+Early implementation. `data_collection` and `features` are implemented and
+unit-tested (all `ee.*` mocked), a reconnaissance/live-run entry point
+(`src/mrv/pipeline/recon.py`) exists, and the **first live Google Earth Engine
+run has been completed** on the Bắc Ninh pilot AOI (see
+`docs/reports/02-first-live-run-report.en.md`). The `baseline` module
+(rule-based crop-season phase detection) is the current module. The `api` and
+`dashboard` layers are not built yet — those parts of the sections below still
+describe the **target architecture** that implementation should converge on.
+Update this file as each module lands so it stays a true description of the
+codebase, not just an aspiration.
 
 ## What this project is
 
