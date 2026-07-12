@@ -17,6 +17,11 @@ class Config:
     max_cloud_cover_pct: float
     min_clear_fraction: float
     feature_indices: tuple[str, ...]
+    # Sentinel-1 SAR orbit lock (spec 07). Optional: the optical pipeline does
+    # not set these, so they default to None and never break an S2-only run.
+    # recon_sar validates their presence when it actually needs them.
+    s1_orbit_pass: str | None = None
+    s1_relative_orbit: int | None = None
 
 
 def load_config(env_path: str | Path | None = None) -> Config:
@@ -32,6 +37,8 @@ def load_config(env_path: str | Path | None = None) -> Config:
         feature_indices=tuple(
             name.strip() for name in _require_env("FEATURE_INDICES").split(",")
         ),
+        s1_orbit_pass=_optional_env("S1_ORBIT_PASS"),
+        s1_relative_orbit=_optional_int_env("S1_RELATIVE_ORBIT"),
     )
 
 
@@ -40,3 +47,13 @@ def _require_env(key: str) -> str:
     if not value:
         raise RuntimeError(f"Missing required environment variable: {key}")
     return value
+
+
+def _optional_env(key: str) -> str | None:
+    value = os.environ.get(key)
+    return value or None
+
+
+def _optional_int_env(key: str) -> int | None:
+    value = os.environ.get(key)
+    return int(value) if value else None

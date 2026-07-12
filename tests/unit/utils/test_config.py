@@ -18,6 +18,11 @@ def _set_env(monkeypatch, overrides=None):
     env = dict(REQUIRED_ENV)
     if overrides:
         env.update(overrides)
+    # Optional S1 vars: clear unless a test sets them, so a developer's real
+    # environment can't leak into the required-fields assertions.
+    for key in ("S1_ORBIT_PASS", "S1_RELATIVE_ORBIT"):
+        if key not in env:
+            monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         if value is None:
             monkeypatch.delenv(key, raising=False)
@@ -40,6 +45,29 @@ def test_load_config_reads_all_fields(monkeypatch, tmp_path):
         min_clear_fraction=0.8,
         feature_indices=("ndvi", "ndwi", "lswi"),
     )
+
+
+def test_load_config_reads_optional_s1_orbit_lock(monkeypatch, tmp_path):
+    _set_env(
+        monkeypatch,
+        overrides={"S1_ORBIT_PASS": "DESCENDING", "S1_RELATIVE_ORBIT": "18"},
+    )
+
+    config = load_config(env_path=tmp_path / "does-not-exist.env")
+
+    assert config.s1_orbit_pass == "DESCENDING"
+    assert config.s1_relative_orbit == 18  # parsed to int
+
+
+def test_load_config_defaults_s1_to_none_when_unset(monkeypatch, tmp_path):
+    # Optical-only runs don't set the S1 vars; they must default to None, not
+    # raise (so an S2 run keeps working unchanged).
+    _set_env(monkeypatch)
+
+    config = load_config(env_path=tmp_path / "does-not-exist.env")
+
+    assert config.s1_orbit_pass is None
+    assert config.s1_relative_orbit is None
 
 
 @pytest.mark.parametrize("missing_key", list(REQUIRED_ENV.keys()))
