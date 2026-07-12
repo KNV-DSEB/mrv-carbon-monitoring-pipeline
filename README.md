@@ -10,7 +10,7 @@ Pilot region: Bắc Ninh province, Red River Delta.
 
 Milestone 1 complete — a local technical MVP — and now **hardened for a live
 integration run**. The `data_collection` and `features` modules have working
-code with **51 tests passing (48 unit + 3 integration), all Google Earth Engine
+code with **59 tests passing (55 unit + 4 integration), all Google Earth Engine
 calls mocked** (no network or credentials needed to run the suite).
 
 Readiness work completed for the first real run:

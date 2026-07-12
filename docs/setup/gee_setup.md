@@ -26,8 +26,13 @@ Google login), so it can run unattended.
 
 1. Cloud Console → "IAM & Admin" → "Service Accounts" → "Create Service
    Account" in the same project.
-2. Grant it the **Earth Engine Resource Viewer** role (read-only is enough
-   for querying/exporting imagery).
+2. Grant it **both** of these roles:
+   - **Earth Engine Resource Viewer** — read access to Earth Engine data
+     (read-only is enough for querying/exporting imagery).
+   - **Service Usage Consumer** (`roles/serviceusage.serviceUsageConsumer`) —
+     lets the service account consume APIs billed under the project; without
+     it, `ee.Initialize(..., project=...)` fails with a 403
+     `USER_PROJECT_DENIED` error.
 3. Create a JSON key for the service account and download it.
 4. **Do not put this key inside the repo.** Store it somewhere outside the
    working tree and set `GEE_SERVICE_ACCOUNT_KEY_PATH` in `.env` to its
