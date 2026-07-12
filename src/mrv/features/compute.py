@@ -28,10 +28,14 @@ def load_manifest(path: Path = DEFAULT_MANIFEST_PATH) -> dict:
 
 
 def _included_scenes(manifest: dict, min_clear_fraction: float) -> list[dict]:
+    # A None aoi_clear_fraction is "no-data" (AOI outside the scene footprint -
+    # not observed), not a low fraction — it cannot meet the threshold, so
+    # exclude it explicitly rather than letting `None >= x` raise a TypeError.
     return [
         scene
         for scene in manifest["scenes"]
-        if scene["aoi_clear_fraction"] >= min_clear_fraction
+        if scene.get("aoi_clear_fraction") is not None
+        and scene["aoi_clear_fraction"] >= min_clear_fraction
     ]
 
 
@@ -54,7 +58,19 @@ def _assert_scenes_to_process(
             "data_collection first (python -m mrv.data_collection.collect) with "
             "a wider DATE_START/DATE_END or a higher MAX_CLOUD_COVER_PCT."
         )
-    best = max(scene["aoi_clear_fraction"] for scene in all_scenes)
+    valid_fractions = [
+        scene["aoi_clear_fraction"]
+        for scene in all_scenes
+        if scene.get("aoi_clear_fraction") is not None
+    ]
+    if not valid_fractions:
+        raise RuntimeError(
+            f"None of the {len(all_scenes)} manifest scene(s) have a computable "
+            "aoi_clear_fraction (all no-data: AOI outside the scene footprint, "
+            f"not observed), so none meet MIN_CLEAR_FRACTION={min_clear_fraction}. "
+            "Collect a denser series or revisit the AOI / date window."
+        )
+    best = max(valid_fractions)
     raise RuntimeError(
         f"None of the {len(all_scenes)} manifest scene(s) meet "
         f"MIN_CLEAR_FRACTION={min_clear_fraction} (best available "

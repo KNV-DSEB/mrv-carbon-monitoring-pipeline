@@ -4,7 +4,6 @@ from unittest.mock import patch
 import pytest
 
 from mrv.data_collection.collect import collect_manifest, main, write_manifest
-from mrv.data_collection.sentinel2 import mask_clouds
 from mrv.utils.config import Config
 
 CONFIG = Config(
@@ -47,7 +46,6 @@ def test_collect_manifest_orchestrates_calls_in_order(
 ):
     aoi_mock = mock_load_aoi.return_value
     collection_mock = mock_get_collection.return_value
-    masked_mock = collection_mock.map.return_value
     mock_build_manifest.return_value = CANNED_SCENES
 
     manifest = collect_manifest(CONFIG)
@@ -57,8 +55,13 @@ def test_collect_manifest_orchestrates_calls_in_order(
     mock_get_collection.assert_called_once_with(
         aoi_mock, CONFIG.date_start, CONFIG.date_end, CONFIG.max_cloud_cover_pct
     )
-    collection_mock.map.assert_called_once_with(mask_clouds)
-    mock_build_manifest.assert_called_once_with(masked_mock, aoi_mock)
+    # Regression lock (spec 05): aoi_clear_fraction must be measured on the RAW
+    # collection so cloud pixels count as 0 in the denominator. Pre-masking here
+    # (the old bug) collapsed the metric to ~1.0/None — so build_manifest must
+    # receive the unmasked collection and NO cloud mask may be applied on this
+    # path. This assertion fails on the old `collection.map(mask_clouds)` code.
+    collection_mock.map.assert_not_called()
+    mock_build_manifest.assert_called_once_with(collection_mock, aoi_mock)
 
     assert manifest["aoi_path"] == CONFIG.aoi_path
     assert manifest["date_start"] == CONFIG.date_start

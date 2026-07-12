@@ -9,7 +9,6 @@ from mrv.data_collection.gee_client import init_ee
 from mrv.data_collection.sentinel2 import (
     build_manifest,
     get_filtered_collection,
-    mask_clouds,
 )
 from mrv.utils.config import Config, load_config
 
@@ -22,8 +21,13 @@ def collect_manifest(config: Config) -> dict:
     collection = get_filtered_collection(
         aoi, config.date_start, config.date_end, config.max_cloud_cover_pct
     )
-    masked_collection = collection.map(mask_clouds)
-    scenes = build_manifest(masked_collection, aoi)
+    # Measure aoi_clear_fraction on the RAW collection, not a cloud-masked one:
+    # build_manifest's SCL.remap([clear]->1, default 0).mean needs the cloud
+    # pixels present so they count as 0 in the denominator (clear / total AOI
+    # pixels in footprint). Pre-masking here would strip the SCL of non-clear
+    # pixels, collapsing the metric to clear/valid ~ 1.0 (see spec 05). The
+    # features module applies its own mask separately for index computation.
+    scenes = build_manifest(collection, aoi)
 
     return {
         "aoi_path": config.aoi_path,

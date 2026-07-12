@@ -59,6 +59,16 @@ def mask_clouds(image: ee.Image, include_unclassified: bool = False) -> ee.Image
 
 
 def _build_scene_feature(image: ee.Image, aoi: ee.Geometry) -> ee.Feature:
+    # `image` MUST be the RAW (unmasked) scene, not a cloud-masked one. The
+    # remap below maps clear SCL classes to 1 and everything else (cloud,
+    # shadow, cirrus, ...) to 0 via the default; the mean over the AOI is then
+    # clear_pixels / (total AOI pixels within the scene footprint). If the SCL
+    # were pre-masked, non-clear pixels would be masked away rather than counted
+    # as 0, collapsing the metric to clear/valid ~ 1.0 (spec 05).
+    #
+    # aoi_clear_fraction is therefore 0.0 for an AOI the footprint covers but is
+    # fully cloudy, and None ONLY when the AOI lies entirely outside the scene
+    # footprint (no valid pixels for the mean -> reduceRegion returns null).
     classes = _clear_scl_classes()
     clear_fraction = (
         image.select("SCL")
@@ -87,6 +97,12 @@ def _build_scene_feature(image: ee.Image, aoi: ee.Geometry) -> ee.Feature:
 
 
 def build_manifest(collection: ee.ImageCollection, aoi: ee.Geometry) -> list[dict]:
+    """Build per-scene manifest rows from an UNMASKED image collection.
+
+    The collection must NOT be cloud-masked: aoi_clear_fraction is measured on
+    the raw SCL so cloud pixels count as 0 in the denominator (see
+    :func:`_build_scene_feature` and spec 05).
+    """
     mapped = collection.map(lambda image: _build_scene_feature(image, aoi))
     raw = ee.FeatureCollection(mapped).getInfo()
     return [feature["properties"] for feature in raw["features"]]

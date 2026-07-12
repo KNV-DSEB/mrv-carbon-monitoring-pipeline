@@ -39,6 +39,36 @@ def test_included_scenes_filters_by_min_clear_fraction():
     assert [scene["image_id"] for scene in result] == ["a", "c"]
 
 
+def test_included_scenes_excludes_none_fraction():
+    # A None aoi_clear_fraction (no-data) is excluded without raising on the
+    # `None >= x` comparison.
+    manifest = {
+        "scenes": [
+            {"image_id": "a", "aoi_clear_fraction": 0.9},
+            {"image_id": "b", "aoi_clear_fraction": None},
+            {"image_id": "c", "aoi_clear_fraction": 0.85},
+        ]
+    }
+
+    result = _included_scenes(manifest, min_clear_fraction=0.8)
+
+    assert [scene["image_id"] for scene in result] == ["a", "c"]
+
+
+def test_compute_features_raises_on_all_none_manifest():
+    # All scenes no-data: must raise the actionable MIN_CLEAR_FRACTION error,
+    # not a TypeError from max() over None.
+    manifest = {
+        "scenes": [
+            {"image_id": "a", "sensing_date": "2026-07-01", "aoi_clear_fraction": None},
+            {"image_id": "b", "sensing_date": "2026-07-11", "aoi_clear_fraction": None},
+        ]
+    }
+
+    with pytest.raises(RuntimeError, match="MIN_CLEAR_FRACTION"):
+        compute_features(CONFIG, manifest, ["ndvi"], min_clear_fraction=0.8)
+
+
 @patch("mrv.features.compute.mask_clouds")
 @patch("mrv.features.compute.ee")
 def test_fetch_masked_image_builds_full_asset_id_and_masks(mock_ee, mock_mask_clouds):

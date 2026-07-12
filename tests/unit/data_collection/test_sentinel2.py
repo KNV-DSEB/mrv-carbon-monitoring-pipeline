@@ -128,3 +128,172 @@ def test_build_manifest_unwraps_feature_properties(mock_ee):
     assert callable(collection.map.call_args[0][0])
     mock_ee.FeatureCollection.assert_called_once_with(collection.map.return_value)
     assert result == canned_scenes
+
+
+# --- Semantics-faithful fake for the clear-fraction contract (spec 05) --------
+#
+# The prior tests use opaque MagicMocks, which model no pixel arithmetic — which
+# is exactly why the "measures clear/valid, not clear/total" bug slipped past 57
+# tests. This fake models the THREE Earth Engine behaviours the contract turns
+# on, and nothing more:
+#   * updateMask(m): pixels where m != 1 become masked (no-data).
+#   * remap(from, to, default): a MASKED pixel stays masked (the default only
+#     applies to VALID pixels not in `from`).
+#   * reduceRegion(mean).get(band): mean over the UNMASKED pixels, or None when
+#     there are none.
+# A pixel value of None represents "masked / outside footprint".
+#
+# It is a MODEL, not real EE — hence spec 05's real acceptance is the owner's
+# live rainy-season recon, not this test.
+
+
+class _FakeReduce:
+    def __init__(self, values):
+        self._values = values
+
+    def get(self, key):
+        return self._values.get(key)
+
+
+class _FakeBand:
+    def __init__(self, pixels, name="SCL"):
+        self.pixels = pixels
+        self.name = name
+
+    def remap(self, frm, to, default):
+        mapping = dict(zip(frm, to))
+        return _FakeBand(
+            [None if p is None else mapping.get(p, default) for p in self.pixels],
+            self.name,
+        )
+
+    def rename(self, name):
+        return _FakeBand(self.pixels, name)
+
+    def eq(self, value):
+        return _FakeBand(
+            [None if p is None else int(p == value) for p in self.pixels], self.name
+        )
+
+    def reduceRegion(self, reducer=None, geometry=None, scale=None, maxPixels=None):
+        valid = [p for p in self.pixels if p is not None]
+        mean = None if not valid else sum(valid) / len(valid)
+        return _FakeReduce({self.name: mean})
+
+
+class _FakeDate:
+    def format(self, fmt):
+        return "2025-07-15"
+
+
+class _FakeImage:
+    """Raw Sentinel-2 scene double carrying only the SCL pixels under test."""
+
+    def __init__(self, scl_pixels, image_id="scene_x"):
+        self._scl = scl_pixels
+        self._id = image_id
+
+    def select(self, band):
+        assert band == "SCL"
+        return _FakeBand(list(self._scl), "SCL")
+
+    def updateMask(self, mask_band):
+        kept = [
+            scl if m == 1 else None for scl, m in zip(self._scl, mask_band.pixels)
+        ]
+        return _FakeImage(kept, self._id)
+
+    def get(self, key):
+        return {
+            "system:index": self._id,
+            "MGRS_TILE": "48QWH",
+            "CLOUDY_PIXEL_PERCENTAGE": 42.0,
+        }[key]
+
+    def date(self):
+        return _FakeDate()
+
+
+class _FakeFeature:
+    def __init__(self, props):
+        self.props = props
+
+
+class _FakeCollection:
+    def __init__(self, images):
+        self._images = images
+
+    def map(self, fn):
+        return _FakeCollection([fn(img) for img in self._images])
+
+
+class _FakeFeatureCollection:
+    def __init__(self, collection):
+        self._collection = collection
+
+    def getInfo(self):
+        return {
+            "features": [
+                {"type": "Feature", "properties": f.props}
+                for f in self._collection._images
+            ]
+        }
+
+
+class _FakeReducerNS:
+    @staticmethod
+    def mean():
+        return "mean"
+
+
+class _FakeEE:
+    Reducer = _FakeReducerNS
+
+    @staticmethod
+    def Feature(geometry, props):
+        return _FakeFeature(props)
+
+    @staticmethod
+    def FeatureCollection(collection):
+        return _FakeFeatureCollection(collection)
+
+
+@patch("mrv.data_collection.sentinel2.ee", _FakeEE)
+def test_build_manifest_measures_clear_over_total_in_footprint():
+    aoi = object()
+    scenes = _FakeCollection(
+        [
+            _FakeImage([8, 8, 8, 8], "all_cloud"),  # observed, fully clouded
+            _FakeImage([4, 5, 6, 8], "mixed"),  # 3 clear + 1 cloud
+            _FakeImage([None, None], "outside"),  # AOI outside footprint
+        ]
+    )
+
+    rows = build_manifest(scenes, aoi)
+    frac = {r["image_id"]: r["aoi_clear_fraction"] for r in rows}
+
+    # Contract: clear / total-in-footprint. Clouds count 0 in the denominator.
+    assert frac["all_cloud"] == 0.0  # fully cloudy AOI -> 0.0, NOT None
+    assert frac["mixed"] == 0.75  # 3 of 4 pixels clear
+    assert frac["outside"] is None  # no-data ONLY when outside the footprint
+
+
+@patch("mrv.data_collection.sentinel2.ee", _FakeEE)
+def test_old_premask_path_collapses_clear_fraction():
+    # Documents WHY the old pipeline was wrong: measuring on the cloud-masked
+    # collection removes non-clear pixels before the reducer, so a fully cloudy
+    # AOI reads as None and a partly cloudy one reads as 1.0. This is the exact
+    # behaviour spec 05 removes; the new path (test above) yields 0.0 / 0.75.
+    aoi = object()
+    scenes = _FakeCollection(
+        [
+            _FakeImage([8, 8, 8, 8], "all_cloud"),
+            _FakeImage([4, 5, 6, 8], "mixed"),
+        ]
+    )
+
+    old_rows = build_manifest(scenes.map(mask_clouds), aoi)
+    frac = {r["image_id"]: r["aoi_clear_fraction"] for r in old_rows}
+
+    assert frac["all_cloud"] is None  # every pixel masked -> no valid -> None
+    assert frac["mixed"] == 1.0  # only the 3 clear pixels survive the mask

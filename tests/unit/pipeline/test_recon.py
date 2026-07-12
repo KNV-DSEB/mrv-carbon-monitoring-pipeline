@@ -65,6 +65,62 @@ def test_summarize_manifest_handles_empty():
     assert all(count == 0 for count in summary["survival"].values())
 
 
+def test_summarize_manifest_counts_none_fraction_separately():
+    # A no-data scene (aoi_clear_fraction=None) must be counted apart from the
+    # valid scenes and must not corrupt the numeric tier-2 outputs.
+    manifest_with_none = {
+        **MANIFEST,
+        "scene_count": 4,
+        "scenes": MANIFEST["scenes"]
+        + [{"image_id": "s_none", "sensing_date": "2026-07-31", "aoi_clear_fraction": None}],
+    }
+
+    summary = summarize_manifest(manifest_with_none, min_clear_fraction=0.8)
+
+    # Tier 1 counts every returned scene; the no-data one is a distinct bucket.
+    assert summary["scene_count"] == 4
+    assert summary["no_data_count"] == 1
+    # Tier 2 numbers are identical to the valid-only manifest: None is excluded,
+    # never coerced to 0.0.
+    baseline = summarize_manifest(MANIFEST, min_clear_fraction=0.8)
+    assert summary["clear_fraction_stats"] == baseline["clear_fraction_stats"]
+    assert summary["histogram"] == baseline["histogram"]
+    assert summary["survival"] == baseline["survival"]
+    assert summary["survivors_at_config"] == baseline["survivors_at_config"]
+
+
+def test_summarize_manifest_all_none_does_not_crash():
+    manifest = {
+        "max_cloud_cover_pct": 90.0,
+        "scene_count": 1,
+        "scenes": [
+            {"image_id": "s_none", "sensing_date": "2026-07-31", "aoi_clear_fraction": None}
+        ],
+    }
+
+    summary = summarize_manifest(manifest, min_clear_fraction=0.8)
+
+    assert summary["scene_count"] == 1
+    assert summary["no_data_count"] == 1
+    assert summary["clear_fraction_stats"] is None
+    assert summary["survivors_at_config"] == 0
+
+
+def test_format_summary_surfaces_no_data_count_at_tier1():
+    manifest_with_none = {
+        **MANIFEST,
+        "scene_count": 4,
+        "scenes": MANIFEST["scenes"]
+        + [{"image_id": "s_none", "sensing_date": "2026-07-31", "aoi_clear_fraction": None}],
+    }
+
+    text = format_summary(summarize_manifest(manifest_with_none, min_clear_fraction=0.8))
+
+    tier1_line = next(line for line in text.splitlines() if line.startswith("Tier 1"))
+    assert "1 no-data" in tier1_line
+    assert "3 with clear-fraction" in tier1_line
+
+
 def test_format_summary_labels_both_tiers_and_knobs():
     text = format_summary(summarize_manifest(MANIFEST, min_clear_fraction=0.8))
 

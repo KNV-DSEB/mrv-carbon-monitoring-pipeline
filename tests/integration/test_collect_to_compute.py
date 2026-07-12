@@ -16,6 +16,7 @@ from mrv.data_collection.collect import collect_manifest, write_manifest
 from mrv.data_collection.collect import main as collect_main
 from mrv.data_collection.sentinel2 import SENTINEL2_COLLECTION_ID
 from mrv.features.compute import compute_features, load_manifest, write_features_table
+from mrv.pipeline.recon import summarize_manifest
 from mrv.utils.config import Config
 
 CONFIG = Config(
@@ -120,6 +121,76 @@ def test_collect_to_compute_happy_path(
     assert lines[0] == "image_id,sensing_date,clear_pixel_fraction,ndvi_mean"
     assert len(lines) == 1 + len(surviving)
     assert lines[1].startswith(surviving[0]["image_id"])
+
+
+@patch("mrv.features.compute.load_aoi_geometry")
+@patch("mrv.features.compute.zonal_mean")
+@patch("mrv.features.compute.ee")
+@patch("mrv.data_collection.collect.load_aoi_geometry")
+@patch("mrv.data_collection.collect.init_ee")
+@patch("mrv.data_collection.sentinel2.ee")
+def test_none_fraction_scene_flows_through_without_a_csv_row(
+    mock_s2_ee,
+    mock_init_ee,
+    mock_collect_aoi,
+    mock_compute_ee,
+    mock_zonal_mean,
+    mock_compute_aoi,
+    tmp_path,
+):
+    # A no-data scene (aoi_clear_fraction=None) interleaved among valid ones:
+    # summarize -> compute -> CSV must not crash, and the None scene must not
+    # produce a CSV row.
+    none_scene = {
+        "image_id": "20260716T033539_20260716T034339_T48QWH",
+        "sensing_date": "2026-07-16",
+        "mgrs_tile": "48QWH",
+        "cloudy_pixel_percentage": 45.0,
+        "aoi_clear_fraction": None,
+    }
+    interleaved = [SCENES[0], none_scene, SCENES[1], SCENES[2]]  # 0.95, None, 0.82, 0.40
+
+    mock_s2_ee.FeatureCollection.return_value.getInfo.return_value = {
+        "features": [{"type": "Feature", "properties": scene} for scene in interleaved]
+    }
+
+    manifest = collect_manifest(CONFIG)
+    manifest_path = tmp_path / "sentinel2_manifest.json"
+    write_manifest(manifest, manifest_path)
+    on_disk = load_manifest(manifest_path)
+
+    # summarize does not crash on the None and counts it as no-data.
+    summary = summarize_manifest(on_disk, CONFIG.min_clear_fraction)
+    assert summary["scene_count"] == 4
+    assert summary["no_data_count"] == 1
+
+    # compute: only the two valid scenes at/above 0.8 survive (None and 0.40 out).
+    surviving = [SCENES[0], SCENES[1]]
+    canned_rows = [
+        {
+            "image_id": scene["image_id"],
+            "sensing_date": scene["sensing_date"],
+            "clear_pixel_fraction": scene["aoi_clear_fraction"],
+            "ndvi_mean": 0.6,
+        }
+        for scene in surviving
+    ]
+    mock_compute_ee.FeatureCollection.return_value.getInfo.return_value = {
+        "features": [{"type": "Feature", "properties": row} for row in canned_rows]
+    }
+
+    rows = compute_features(CONFIG, on_disk, ["ndvi"], CONFIG.min_clear_fraction)
+    csv_path = tmp_path / "spectral_indices.csv"
+    write_features_table(rows, ["ndvi"], csv_path)
+
+    # The None scene was never fetched from GEE...
+    requested = [call.args[0] for call in mock_compute_ee.Image.call_args_list]
+    assert f"{SENTINEL2_COLLECTION_ID}/{none_scene['image_id']}" not in requested
+    # ...and it has no CSV row: header + exactly the two surviving scenes.
+    text = csv_path.read_text(encoding="utf-8")
+    lines = text.strip().splitlines()
+    assert len(lines) == 1 + len(surviving)
+    assert none_scene["image_id"] not in text
 
 
 @patch("mrv.data_collection.collect.write_manifest")
