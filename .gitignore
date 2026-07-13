@@ -24,6 +24,12 @@ data/external/**
 !data/external/aoi/
 !data/external/aoi/*.geojson
 
+# Demo snapshot CSVs for the credential-free dashboard (small, from real runs) —
+# intentionally tracked so the dashboard runs without GEE keys. Not caught by the
+# data/* ignores above; whitelisted explicitly for clarity and future-proofing.
+!data/demo/
+!data/demo/*.csv
+
 # MLflow local tracking store
 mlruns/
 
@@ -43,3 +49,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local scratch scripts
+tmp/

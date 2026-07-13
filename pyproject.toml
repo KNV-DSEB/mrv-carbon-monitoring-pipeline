@@ -11,6 +11,9 @@ dependencies = [
     "earthengine-api",
     "python-dotenv",
     "pytest",
+    # Dashboard (spec 08). Brings altair/pandas/pydeck with it — the dashboard
+    # uses only those bundled libraries, no further dependencies.
+    "streamlit",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,0 +1,5 @@
+season,window,sensor,usable_scenes,gap_min,gap_median,gap_max
+Vụ Mùa,2025-07-01..2025-08-15,optical,0,,,
+Vụ Mùa,2025-07-01..2025-08-15,SAR,5,6,9,12
+Đông-Xuân,2026-01-15..2026-06-30,optical,7,,,
+Đông-Xuân,2026-01-15..2026-06-30,SAR,14,7,12,24
