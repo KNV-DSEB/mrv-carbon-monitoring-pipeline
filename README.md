@@ -1,18 +1,34 @@
-# MRV Carbon Monitoring Pipeline
+<div align="center">
 
-Satellite MRV (Measurement, Reporting, Verification) for methane reduction in
-Vietnamese rice paddies — **Sentinel-2 optical + Sentinel-1 SAR**, processed
-server-side on Google Earth Engine, run end-to-end on **real data** over a pilot
-AOI in **Lương Tài, Bắc Ninh**.
+# 🌾 MRV Carbon Monitoring Pipeline
 
-> **What this repository actually is:** a **technical portfolio project**, not a
-> commercial product. It detects **crop-season phases**, **not** AWD irrigation
-> events. There is no field ground truth, so **no accuracy figure is claimed
-> anywhere.** The most valuable thing in here is [the technical story](#3-the-technical-story)
-> — a silent metric bug that survived 57 tests, how it was caught, and the
-> headline result it forced me to throw away.
+**Satellite MRV for methane reduction in Vietnamese rice paddies**
 
-**Live demo — no credentials needed:** `streamlit run dashboard/app.py`
+Sentinel-2 optical **+** Sentinel-1 SAR · Google Earth Engine · run end-to-end on **real data** over Lương Tài, Bắc Ninh
+
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white&style=flat-square)](pyproject.toml)
+[![tests 100 passing](https://img.shields.io/badge/tests-100_passing-2ea44f?style=flat-square)](tests/)
+[![Google Earth Engine](https://img.shields.io/badge/Google_Earth_Engine-live_data-4285F4?logo=googleearthengine&logoColor=white&style=flat-square)](docs/setup/gee_setup.md)
+[![Streamlit demo](https://img.shields.io/badge/dashboard-Streamlit-FF4B4B?logo=streamlit&logoColor=white&style=flat-square)](dashboard/app.py)
+[![status: portfolio piece](https://img.shields.io/badge/status-technical_portfolio_piece-6f42c1?style=flat-square)](#4-limitations--and-why-i-stopped)
+
+</div>
+
+> [!IMPORTANT]
+> **This is a technical portfolio project, not a commercial product.** It detects
+> **crop-season phases — not AWD irrigation events** — and with no field ground
+> truth it claims **no accuracy figure anywhere.** The most valuable thing in this
+> repo is **[the technical story »](#3-the-technical-story)**: a silent metric bug
+> that survived 57 green tests, how I caught it, and the headline result the fix
+> forced me to delete.
+
+> [!TIP]
+> **The 60-second version.** A cloud metric read a flawless `1.000` on every scene
+> → [that *was* the bug](#3-the-technical-story) → the fix deleted my own best
+> result (a "peak" that turned out to be a cloud) → optical was then **0 / 11
+> usable in the rainy season** → so I added **Sentinel-1 SAR**, which
+> cross-confirms the flood through *independent physics*, two days apart.
+> See it yourself: **`streamlit run dashboard/app.py`** — no credentials needed.
 
 ---
 
