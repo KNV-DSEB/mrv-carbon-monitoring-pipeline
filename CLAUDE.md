@@ -4,16 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Early implementation. `data_collection` and `features` are implemented and
-unit-tested (all `ee.*` mocked), a reconnaissance/live-run entry point
-(`src/mrv/pipeline/recon.py`) exists, and the **first live Google Earth Engine
-run has been completed** on the Bắc Ninh pilot AOI (see
-`docs/reports/02-first-live-run-report.en.md`). The `baseline` module
-(rule-based crop-season phase detection) is the current module. The `api` and
-`dashboard` layers are not built yet — those parts of the sections below still
-describe the **target architecture** that implementation should converge on.
-Update this file as each module lands so it stays a true description of the
-codebase, not just an aspiration.
+**Concluded as a technical portfolio piece** (see README §4 for why). The
+commercial/venture direction is stopped: no AWD event detector, no per-parcel
+work, no multi-orbit, no business development. Do not re-introduce them.
+
+What exists and works, on real Google Earth Engine data over the Bắc Ninh pilot
+AOI (100 tests: 96 unit + 4 integration, all `ee.*` mocked):
+
+- `data_collection` — Sentinel-2 (`sentinel2.py`) + Sentinel-1 SAR (`sentinel1.py`).
+- `features` — spectral indices/zonal stats + SAR VV/VH backscatter.
+- `baseline` — rule-based crop-season phase detection (NOT AWD detection).
+- `pipeline` — `recon.py` (optical) and `recon_sar.py` (SAR) reconnaissance.
+- `dashboard/` — Streamlit demo that runs with **no GEE credentials**, reading
+  committed snapshots from `data/demo/`.
+- Reports: `docs/reports/02-*` (first live run) and `03-*` (SAR findings), EN+VI.
+
+The `api` layer was never built and is **not planned**. Sections below that
+describe it are historical target architecture, not a to-do list.
 
 ## What this project is
 
